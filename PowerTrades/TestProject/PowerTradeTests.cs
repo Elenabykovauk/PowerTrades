@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -10,7 +12,7 @@ using Services;
 
 namespace TestProject
 {
-    public class Tests
+    public class PowerTradeTests
     {
         [Test]
         public void GetReportTest()
@@ -20,11 +22,15 @@ namespace TestProject
             var mockConfiguration = new Mock<IConfiguration>();
             var mockLogger = new Mock<ILogger<PowerTradeExportService>>();
 
-            PowerTradeExportService powerTradeExportService = new PowerTradeExportService(mockPowerService.Object, mockConfiguration.Object, mockLogger.Object);
+            PowerTradeExportService powerTradeExportService = new(mockPowerService.Object, mockConfiguration.Object, mockLogger.Object);
             var trades = GetTrades();
 
             // act
-            var report = powerTradeExportService.GetReport(trades).ToArray();
+            Type serviceType = powerTradeExportService.GetType();
+            MethodInfo method = serviceType.GetMethod("GetReport", BindingFlags.NonPublic | BindingFlags.Instance);
+            object[] parameters = { trades };
+
+            var report = ((IEnumerable<IntraDayReport>)method.Invoke(powerTradeExportService, parameters)).ToArray();
 
             // assert
             Assert.IsNotNull(report);
@@ -39,25 +45,42 @@ namespace TestProject
             var mockConfiguration = new Mock<IConfiguration>();
             var mockLogger = new Mock<ILogger<PowerTradeExportService>>();
 
-            PowerTradeExportService powerTradeExportService = new PowerTradeExportService(mockPowerService.Object, mockConfiguration.Object, mockLogger.Object);
+            PowerTradeExportService powerTradeExportService = new(mockPowerService.Object, mockConfiguration.Object, mockLogger.Object);
             var filePath = @"C:/Projects/test.csv";
 
+            File.Delete(filePath);
+
             // act
-            powerTradeExportService.SaveCsv(filePath, GetTrades());
+            Type serviceType = powerTradeExportService.GetType();
+            MethodInfo method = serviceType.GetMethod("SaveCsv", BindingFlags.NonPublic | BindingFlags.Instance);
+            object[] parameters = { filePath, GetReport().ToList() };
+            method.Invoke(powerTradeExportService, parameters);
 
             // assert
             Assert.IsTrue(File.Exists(filePath));
+            File.Delete(filePath);
+        }
+
+        private IEnumerable<IntraDayReport> GetReport()
+        {
+            IntraDayReport[] array = (from period in Enumerable.Range(1, 24)
+                                      select new IntraDayReport
+                                      {
+                                          LocalTime = DateTime.Now.Date.AddHours(period).ToShortTimeString(),
+                                          Volume = period
+                                      }).ToArray();
+            return array;
         }
 
         private IEnumerable<PowerTrade> GetTrades()
         {
             int num = 0;
             PowerTrade[] array = (from _ in Enumerable.Range(0, 3)
-                                  select PowerTrade.Create(System.DateTime.Now, 24)).ToArray(); 
-            
+                                  select PowerTrade.Create(System.DateTime.Now, 24)).ToArray();
+
             foreach (PowerTrade obj in array)
             {
-                foreach(PowerPeriod powerPeriod in obj.Periods)
+                foreach (PowerPeriod powerPeriod in obj.Periods)
                 {
                     double volume = ((double)(num + 1));
                     powerPeriod.Volume = volume;

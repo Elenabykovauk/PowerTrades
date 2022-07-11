@@ -1,10 +1,13 @@
 ﻿using System.Globalization;
+using System.Runtime.CompilerServices;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Services;
 
+[assembly: InternalsVisibleTo("TestProject")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleToAttribute("TestProject")]
 namespace PowerTrades
 {
     public class PowerTradeExportService : IPowerTradeExportService
@@ -49,7 +52,7 @@ namespace PowerTrades
             }
         }
 
-        public IEnumerable<IntraDayReport> GetReport(IEnumerable<PowerTrade> trades)
+        private IEnumerable<IntraDayReport> GetReport(IEnumerable<PowerTrade> trades)
         {
             DateTime timeStart = DateTime.Now.Date.AddHours(-2);
 
@@ -75,7 +78,7 @@ namespace PowerTrades
             return null;
         }
 
-        public void SaveCsv<T>(string filePath, IEnumerable<T> list)
+        private void SaveCsv(string filePath, IEnumerable<IntraDayReport> list)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
